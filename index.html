@@ -36,6 +36,7 @@
             flex-direction: column;
             align-items: center;
             flex: 1;
+            position: relative;
         }
 
         .game-sidebar {
@@ -65,12 +66,17 @@
             border-radius: 10px;
         }
 
+        .game-main {
+            position: relative;
+        }
+
         #gameCanvas {
             border: 3px solid #333;
             border-radius: 10px;
             background: #1a1a1a;
             display: block;
             margin: 0 auto;
+            position: relative;
             width: 400px;
             height: 400px;
             box-sizing: border-box;
@@ -223,7 +229,7 @@
         }
 
         .clear-data-btn {
-            margin-top: 15px;
+            margin-top: 0;
             padding: 8px 16px;
             font-size: 0.85em;
             background: rgba(255, 255, 255, 0.2);
@@ -232,11 +238,17 @@
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.3s;
+            flex: 1;
+            min-width: 80px;
         }
 
         .clear-data-btn:hover {
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .clear-data-btn:active {
+            transform: scale(0.95);
         }
 
         .rank-help-btn {
@@ -365,6 +377,91 @@
             background: #f9f9f9;
         }
 
+        .pause-overlay {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            border-radius: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .pause-overlay {
+                width: min(400px, 100vw - 40px);
+                height: min(400px, 100vw - 40px);
+            }
+        }
+
+        .pause-text {
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .virtual-controls {
+            display: none;
+            margin-top: 20px;
+            user-select: none;
+        }
+
+        .virtual-controls.show {
+            display: block;
+        }
+
+        .virtual-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            justify-content: center;
+            margin: 0 auto;
+        }
+
+        .virtual-btn {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #667eea;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            cursor: pointer;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+
+        .virtual-btn:active {
+            background: #667eea;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        .virtual-btn.empty {
+            border: none;
+            background: transparent;
+            cursor: default;
+        }
+
+        .virtual-btn.empty:active {
+            transform: none;
+        }
+
+        @media (max-width: 768px) {
+            .virtual-controls {
+                display: block;
+            }
+        }
+
         @media (max-width: 768px) {
             .game-container {
                 flex-direction: column;
@@ -411,7 +508,28 @@
         <div class="game-main">
             <canvas id="gameCanvas" width="400" height="400"></canvas>
             <div class="controls">
-                <p>使用方向键或 WASD 控制蛇的移动</p>
+                <p>使用方向键或 WASD 控制蛇的移动 | 空格键暂停</p>
+                <p style="margin-top: 5px; font-size: 0.9em; color: #888;">当前难度: <span id="currentDifficultyDisplay">普通</span></p>
+            </div>
+            
+            <!-- 暂停提示 -->
+            <div id="pauseOverlay" class="pause-overlay" style="display: none;">
+                <div class="pause-text">⏸️ 游戏已暂停<br>按空格键继续</div>
+            </div>
+
+            <!-- 虚拟方向键（移动端） -->
+            <div class="virtual-controls" id="virtualControls">
+                <div class="virtual-controls-grid">
+                    <div class="virtual-btn empty"></div>
+                    <div class="virtual-btn" data-direction="up">↑</div>
+                    <div class="virtual-btn empty"></div>
+                    <div class="virtual-btn" data-direction="left">←</div>
+                    <div class="virtual-btn empty"></div>
+                    <div class="virtual-btn" data-direction="right">→</div>
+                    <div class="virtual-btn empty"></div>
+                    <div class="virtual-btn" data-direction="down">↓</div>
+                    <div class="virtual-btn empty"></div>
+                </div>
             </div>
 
             <div class="rank-display">
@@ -424,7 +542,12 @@
                     <div class="rank-progress">
                         <div class="rank-progress-bar" id="rankProgress" style="width: 0%"></div>
                     </div>
-                    <button class="clear-data-btn" id="clearDataBtn">清除数据</button>
+                    <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+                        <button class="clear-data-btn" id="clearDataBtn">清除数据</button>
+                        <button class="clear-data-btn" id="exportDataBtn" style="background: rgba(76, 175, 80, 0.3);">导出数据</button>
+                        <button class="clear-data-btn" id="importDataBtn" style="background: rgba(33, 150, 243, 0.3);">导入数据</button>
+                    </div>
+                    <input type="file" id="importFileInput" accept=".json" style="display: none;">
                 </div>
             </div>
         </div>
@@ -561,6 +684,9 @@
         const rankHintElement = document.getElementById('rankHint');
         const rankHelpBtn = document.getElementById('rankHelpBtn');
         const rankHelpModal = document.getElementById('rankHelpModal');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+        const currentDifficultyDisplay = document.getElementById('currentDifficultyDisplay');
+        const virtualControls = document.getElementById('virtualControls');
 
         // 游戏设置
         const gridSize = 20;
@@ -602,14 +728,18 @@
         let food = {};
         let dx = 0;
         let dy = 0;
+        let nextDx = 0;  // 下一个方向（用于防止快速按键）
+        let nextDy = 0;
         let score = 0;
         let highScore = parseInt(localStorage.getItem('snakeHighScore') || 0);
         let gameRunning = false;
+        let gamePaused = false;
         let currentDifficulty = 'normal';
         let gameSpeed = 150;
         let rankPoints = parseInt(localStorage.getItem('rankPoints') || 0);
         let previousRank = null;
         let canRestartWithKey = false; // 是否允许通过方向键重新开始
+        let canChangeDirection = true; // 是否可以改变方向（防止快速按键）
 
         // 显示最高分和段位
         highScoreElement.textContent = highScore;
@@ -627,6 +757,9 @@
             const config = difficultyConfig[difficulty];
             gameSpeed = config.speed;
             
+            // 更新难度显示
+            currentDifficultyDisplay.textContent = config.name;
+            
             // 更新按钮状态
             document.querySelectorAll('.difficulty-btn').forEach(btn => {
                 btn.classList.remove('active');
@@ -637,11 +770,16 @@
             initSnake();
             dx = 0;
             dy = 0;
+            nextDx = 0;
+            nextDy = 0;
             score = 0;
             scoreElement.textContent = 0;
             gameRunning = false; // 确保游戏状态为未运行
+            gamePaused = false;
+            canChangeDirection = true;
             gameOverElement.classList.remove('show'); // 隐藏游戏结束弹窗
             rankChangeElement.innerHTML = ''; // 清空段位变化信息
+            pauseOverlay.style.display = 'none';
             generateFood();
             drawGame();
         }
@@ -814,6 +952,10 @@
             rankPointsElement.textContent = rankPoints;
             rankProgressElement.style.width = rankInfo.progress + '%';
             
+            // 根据段位设置进度条颜色
+            const rankColor = rankConfig[rankInfo.rank].color;
+            rankProgressElement.style.background = rankColor;
+            
             // 显示段位提示
             if (rankInfo.rank === 'king') {
                 rankHintElement.textContent = '王者段位只能通过困难模式获得段位分';
@@ -897,10 +1039,36 @@
 
         // 移动蛇
         function moveSnake() {
+            // 应用下一个方向（防止快速按键）
+            if (nextDx !== 0 || nextDy !== 0) {
+                // 检查是否可以改变方向（不能直接反向）
+                const goingUp = dy === -1;
+                const goingDown = dy === 1;
+                const goingRight = dx === 1;
+                const goingLeft = dx === -1;
+                
+                const newGoingUp = nextDy === -1;
+                const newGoingDown = nextDy === 1;
+                const newGoingRight = nextDx === 1;
+                const newGoingLeft = nextDx === -1;
+                
+                // 只有在不是直接反向的情况下才改变方向
+                if (!((goingRight && newGoingLeft) || (goingLeft && newGoingRight) || 
+                      (goingUp && newGoingDown) || (goingDown && newGoingUp))) {
+                    dx = nextDx;
+                    dy = nextDy;
+                }
+                nextDx = 0;
+                nextDy = 0;
+            }
+            
             // 如果蛇没有移动方向，不执行移动
             if (dx === 0 && dy === 0) {
                 return;
             }
+            
+            // 允许下次改变方向
+            canChangeDirection = true;
 
             const head = {x: snake[0].x + dx, y: snake[0].y + dy};
 
@@ -959,13 +1127,23 @@
                 
                 // 显示段位变化
                 const newRank = calculateRank(rankPoints);
-                let rankChangeText = `获得段位分: <span style="color: #4CAF50; font-weight: bold;">+${earnedPoints}</span>`;
+                const config = difficultyConfig[currentDifficulty];
+                const calculatedPoints = Math.floor(score * config.multiplier * 0.15);
+                const actualPoints = Math.min(50, Math.max(1, calculatedPoints));
+                
+                let rankChangeText = `<div style="font-size: 1.1em; margin-bottom: 10px;">
+                    <strong>获得段位分: <span style="color: #4CAF50; font-weight: bold; font-size: 1.2em;">+${earnedPoints}</span></strong>
+                </div>`;
+                rankChangeText += `<div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                    计算方式: ${score}分 × ${config.multiplier}倍率 × 0.15 = ${calculatedPoints}分<br>
+                    实际获得: ${actualPoints}分（单局上限50分）
+                </div>`;
                 
                 // 检查是否升段
                 if (previousRank.rank !== newRank.rank) {
-                    rankChangeText += `<br><span class="rank-up">🎉 恭喜升段！${previousRank.display} → ${newRank.display}</span>`;
+                    rankChangeText += `<div style="margin-top: 10px;"><span class="rank-up">🎉 恭喜升段！${previousRank.display} → ${newRank.display}</span></div>`;
                 } else if (previousRank.display !== newRank.display) {
-                    rankChangeText += `<br><span class="rank-up">🎉 恭喜升段！${previousRank.display} → ${newRank.display}</span>`;
+                    rankChangeText += `<div style="margin-top: 10px;"><span class="rank-up">🎉 恭喜升段！${previousRank.display} → ${newRank.display}</span></div>`;
                 }
                 
                 rankChangeElement.innerHTML = rankChangeText;
@@ -977,15 +1155,47 @@
                 
                 // 显示段位变化
                 const newRank = calculateRank(rankPoints);
-                let rankChangeText = `扣除段位分: <span style="color: #f44336; font-weight: bold;">-${penalty}</span>`;
+                const currentRankInfo = calculateRank(rankPoints + penalty); // 扣分前的段位
+                
+                // 判断扣分原因
+                const minScoreRequirement = {
+                    easy: 20,
+                    normal: 30,
+                    hard: 40
+                };
+                let reasonText = '';
+                if (score < minScoreRequirement[currentDifficulty]) {
+                    reasonText = `未达到最低分数要求（${minScoreRequirement[currentDifficulty]}分）`;
+                } else if (currentRankInfo.rank === 'gold' || currentRankInfo.rank === 'platinum' || 
+                          currentRankInfo.rank === 'diamond' || currentRankInfo.rank === 'king') {
+                    const rankMinScore = {
+                        gold: { easy: 30, normal: 50, hard: 70 },
+                        platinum: { easy: 40, normal: 70, hard: 100 },
+                        diamond: { easy: 50, normal: 90, hard: 130 },
+                        king: { easy: 0, normal: 0, hard: 150 }
+                    };
+                    const requiredScore = rankMinScore[currentRankInfo.rank][currentDifficulty];
+                    if (score < requiredScore) {
+                        reasonText = `未达到${currentRankInfo.display}段位要求分数（${requiredScore}分）`;
+                    }
+                }
+                
+                let rankChangeText = `<div style="font-size: 1.1em; margin-bottom: 10px;">
+                    <strong>扣除段位分: <span style="color: #f44336; font-weight: bold; font-size: 1.2em;">-${penalty}</span></strong>
+                </div>`;
+                if (reasonText) {
+                    rankChangeText += `<div style="font-size: 0.9em; color: #ff9800; margin-bottom: 10px;">
+                        扣分原因: ${reasonText}
+                    </div>`;
+                }
                 
                 // 检查是否降段
                 if (previousRank.rank !== newRank.rank) {
-                    rankChangeText += `<br><span style="color: #f44336;">⚠️ 降段了！${previousRank.display} → ${newRank.display}</span>`;
+                    rankChangeText += `<div style="margin-top: 10px;"><span style="color: #f44336;">⚠️ 降段了！${previousRank.display} → ${newRank.display}</span></div>`;
                 } else if (previousRank.display !== newRank.display) {
-                    rankChangeText += `<br><span style="color: #f44336;">⚠️ 降段了！${previousRank.display} → ${newRank.display}</span>`;
+                    rankChangeText += `<div style="margin-top: 10px;"><span style="color: #f44336;">⚠️ 降段了！${previousRank.display} → ${newRank.display}</span></div>`;
                 } else {
-                    rankChangeText += `<br><span style="color: #ff9800;">分数未达到要求，继续努力！</span>`;
+                    rankChangeText += `<div style="margin-top: 10px;"><span style="color: #ff9800;">分数未达到要求，继续努力！</span></div>`;
                 }
                 
                 rankChangeElement.innerHTML = rankChangeText;
@@ -1014,18 +1224,37 @@
             initSnake();
             dx = 0;
             dy = 0;
+            nextDx = 0;
+            nextDy = 0;
             score = 0;
             scoreElement.textContent = 0;
             gameRunning = false;
+            gamePaused = false;
+            canChangeDirection = true;
             canRestartWithKey = false;
             
-            // 隐藏游戏结束弹窗
+            // 隐藏游戏结束弹窗和暂停提示
             gameOverElement.classList.remove('show');
             rankChangeElement.innerHTML = '';
+            pauseOverlay.style.display = 'none';
             
             // 重新生成食物并绘制
             generateFood();
             drawGame();
+        }
+
+        // 暂停/继续游戏
+        function togglePause() {
+            if (!gameRunning) return;
+            
+            gamePaused = !gamePaused;
+            if (gamePaused) {
+                pauseOverlay.style.display = 'flex';
+            } else {
+                pauseOverlay.style.display = 'none';
+                lastFrameTime = performance.now(); // 重置时间，避免暂停后立即移动
+                requestAnimationFrame(gameLoop);
+            }
         }
 
         // 重新开始游戏
@@ -1033,6 +1262,8 @@
             // 先设置方向
             dx = initialDx;
             dy = initialDy;
+            nextDx = 0;
+            nextDy = 0;
             
             // 根据方向创建蛇的身体
             if (dx !== 0 || dy !== 0) {
@@ -1044,22 +1275,29 @@
             
             score = 0;
             gameRunning = true;
+            gamePaused = false;
+            canChangeDirection = true;
             canRestartWithKey = false; // 游戏开始后，重置状态
             gameOverElement.classList.remove('show');
             rankChangeElement.innerHTML = '';
+            pauseOverlay.style.display = 'none';
+            lastFrameTime = performance.now();
             generateFood();
             drawGame();
-            gameLoop();
+            requestAnimationFrame(gameLoop);
         }
 
-        // 游戏主循环
-        function gameLoop() {
-            if (gameRunning) {
-                setTimeout(function onTick() {
+        // 游戏主循环（使用requestAnimationFrame）
+        let lastFrameTime = 0;
+        function gameLoop(currentTime) {
+            if (gameRunning && !gamePaused) {
+                // 控制游戏速度
+                if (currentTime - lastFrameTime >= gameSpeed) {
                     moveSnake();
                     drawGame();
-                    gameLoop();
-                }, gameSpeed);
+                    lastFrameTime = currentTime;
+                }
+                requestAnimationFrame(gameLoop);
             }
         }
 
@@ -1092,27 +1330,41 @@
                 return;
             }
 
-            // 游戏运行中的控制
-            const goingUp = dy === -1;
-            const goingDown = dy === 1;
-            const goingRight = dx === 1;
-            const goingLeft = dx === -1;
+            // 暂停功能（按空格键）
+            if (keyPressed === 32) { // 空格键
+                if (gameRunning) {
+                    togglePause();
+                }
+                return;
+            }
 
-            if ((keyPressed === LEFT_KEY || keyPressed === A_KEY) && !goingRight) {
-                dx = -1;
-                dy = 0;
-            }
-            if ((keyPressed === UP_KEY || keyPressed === W_KEY) && !goingDown) {
-                dx = 0;
-                dy = -1;
-            }
-            if ((keyPressed === RIGHT_KEY || keyPressed === D_KEY) && !goingLeft) {
-                dx = 1;
-                dy = 0;
-            }
-            if ((keyPressed === DOWN_KEY || keyPressed === S_KEY) && !goingUp) {
-                dx = 0;
-                dy = 1;
+            // 游戏运行中的控制（使用nextDx/nextDy防止快速按键）
+            if (gameRunning && !gamePaused && canChangeDirection) {
+                const goingUp = dy === -1;
+                const goingDown = dy === 1;
+                const goingRight = dx === 1;
+                const goingLeft = dx === -1;
+
+                if ((keyPressed === LEFT_KEY || keyPressed === A_KEY) && !goingRight) {
+                    nextDx = -1;
+                    nextDy = 0;
+                    canChangeDirection = false; // 锁定方向改变，直到下次移动
+                }
+                if ((keyPressed === UP_KEY || keyPressed === W_KEY) && !goingDown) {
+                    nextDx = 0;
+                    nextDy = -1;
+                    canChangeDirection = false;
+                }
+                if ((keyPressed === RIGHT_KEY || keyPressed === D_KEY) && !goingLeft) {
+                    nextDx = 1;
+                    nextDy = 0;
+                    canChangeDirection = false;
+                }
+                if ((keyPressed === DOWN_KEY || keyPressed === S_KEY) && !goingUp) {
+                    nextDx = 0;
+                    nextDy = 1;
+                    canChangeDirection = false;
+                }
             }
         });
 
@@ -1123,6 +1375,71 @@
                 selectDifficulty(difficulty);
             });
         });
+
+        // 虚拟方向键事件处理
+        document.querySelectorAll('.virtual-btn[data-direction]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const direction = this.getAttribute('data-direction');
+                handleDirectionInput(direction);
+            });
+            
+            // 触摸事件（移动端）
+            btn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                const direction = this.getAttribute('data-direction');
+                handleDirectionInput(direction);
+            });
+        });
+
+        // 处理方向输入（统一处理键盘和虚拟按键）
+        function handleDirectionInput(direction) {
+            if (!gameRunning) {
+                // 如果游戏未运行，按方向键开始/重新开始游戏
+                if (direction === 'left') {
+                    restartGame(-1, 0);
+                } else if (direction === 'up') {
+                    restartGame(0, -1);
+                } else if (direction === 'right') {
+                    restartGame(1, 0);
+                } else if (direction === 'down') {
+                    restartGame(0, 1);
+                }
+                return;
+            }
+            
+            if (gamePaused) {
+                return; // 暂停时不允许改变方向
+            }
+
+            // 游戏运行中的控制
+            if (canChangeDirection) {
+                const goingUp = dy === -1;
+                const goingDown = dy === 1;
+                const goingRight = dx === 1;
+                const goingLeft = dx === -1;
+
+                if (direction === 'left' && !goingRight) {
+                    nextDx = -1;
+                    nextDy = 0;
+                    canChangeDirection = false;
+                } else if (direction === 'up' && !goingDown) {
+                    nextDx = 0;
+                    nextDy = -1;
+                    canChangeDirection = false;
+                } else if (direction === 'right' && !goingLeft) {
+                    nextDx = 1;
+                    nextDy = 0;
+                    canChangeDirection = false;
+                } else if (direction === 'down' && !goingUp) {
+                    nextDx = 0;
+                    nextDy = 1;
+                    canChangeDirection = false;
+                }
+            }
+        }
+
+        // 初始化难度显示
+        currentDifficultyDisplay.textContent = difficultyConfig[currentDifficulty].name;
 
         // 清除数据功能
         function clearAllData() {
@@ -1166,6 +1483,129 @@
                 alert('游戏进行中无法清除数据，请先结束游戏！');
             }
         });
+
+        // 导出数据功能
+        function exportData() {
+            if (gameRunning) {
+                alert('游戏进行中无法导出数据，请先结束游戏！');
+                return;
+            }
+
+            const data = {
+                rankPoints: rankPoints,
+                highScore: highScore,
+                exportTime: new Date().toISOString(),
+                version: '1.0'
+            };
+
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `snake-game-data-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            // 同时复制到剪贴板
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(dataStr).then(() => {
+                    alert('数据已导出并复制到剪贴板！\n\n文件已下载，同时数据已复制到剪贴板，您也可以直接粘贴分享。');
+                }).catch(() => {
+                    alert('数据已导出！\n\n文件已下载。');
+                });
+            } else {
+                alert('数据已导出！\n\n文件已下载。');
+            }
+        }
+
+        // 导入数据功能
+        function importData() {
+            if (gameRunning) {
+                alert('游戏进行中无法导入数据，请先结束游戏！');
+                return;
+            }
+
+            const fileInput = document.getElementById('importFileInput');
+            fileInput.click();
+        }
+
+        // 处理文件导入
+        document.getElementById('importFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+
+                    // 验证数据格式
+                    if (typeof importedData.rankPoints !== 'number' || 
+                        typeof importedData.highScore !== 'number') {
+                        throw new Error('数据格式不正确');
+                    }
+
+                    // 验证数据范围
+                    if (importedData.rankPoints < 0 || importedData.highScore < 0) {
+                        throw new Error('数据值无效');
+                    }
+
+                    // 确认导入
+                    const confirmMsg = `确定要导入数据吗？\n\n` +
+                        `段位分: ${importedData.rankPoints} (当前: ${rankPoints})\n` +
+                        `最高分: ${importedData.highScore} (当前: ${highScore})\n\n` +
+                        `导入后将覆盖当前数据！`;
+                    
+                    if (confirm(confirmMsg)) {
+                        // 导入数据
+                        rankPoints = Math.floor(importedData.rankPoints);
+                        highScore = Math.floor(importedData.highScore);
+
+                        // 保存到localStorage
+                        localStorage.setItem('rankPoints', rankPoints);
+                        localStorage.setItem('snakeHighScore', highScore);
+
+                        // 更新显示
+                        highScoreElement.textContent = highScore;
+                        updateRankDisplay();
+
+                        alert('数据导入成功！');
+                    }
+                } catch (error) {
+                    alert('导入失败：数据格式不正确或文件已损坏。\n\n请确保导入的是正确的游戏数据文件。');
+                    console.error('Import error:', error);
+                }
+
+                // 清空文件输入，以便可以再次选择同一文件
+                e.target.value = '';
+            };
+
+            reader.onerror = function() {
+                alert('读取文件失败，请重试。');
+                e.target.value = '';
+            };
+
+            reader.readAsText(file);
+        });
+
+        // 绑定导出数据按钮事件
+        document.getElementById('exportDataBtn').addEventListener('click', function() {
+            exportData();
+        });
+
+        // 绑定导入数据按钮事件
+        document.getElementById('importDataBtn').addEventListener('click', function() {
+            importData();
+        });
+
+        // 暴露函数到window，方便调试
+        window.exportData = exportData;
+        window.importData = importData;
 
         // 打开段位规则说明
         function openRankHelp() {
